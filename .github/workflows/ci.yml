@@ -44,7 +44,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "__version__ = \"$VERSION\"" > bqplot_linlog/_version.py
-          cd js && npm version $VERSION --no-git-tag-version
+          cd js && npm version $VERSION --no-git-tag-version --allow-same-version
 
       - name: Install JavaScript dependencies
         run: (cd js && npm ci && npm run build && npm pack)
@@ -139,7 +139,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "__version__ = \"$VERSION\"" > bqplot_linlog/_version.py
-          cd js && npm version $VERSION --no-git-tag-version
+          cd js && npm version $VERSION --no-git-tag-version --allow-same-version
 
       - name: Update changelog
         uses: stefanzweifel/changelog-updater-action@v1
