@@ -75,3 +75,8 @@ dependencies = [
 [tool.hatch.build.hooks.jupyter-builder.build-kwargs]
 path = "./js"
 build_cmd = "build"
+
+[tool.pytest.ini_options]
+markers = [
+    "mpl_image_compare",
+]

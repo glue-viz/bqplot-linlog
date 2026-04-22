@@ -1,0 +1,57 @@
+name: Update Visual References
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-visual-references:
+    name: Update Visual References
+    if: ${{ github.event.issue.pull_request && contains(github.event.comment.body, 'update baseline') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Checkout the branch from the PR that triggered the job
+        run: gh pr checkout ${{ github.event.issue.number }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox
+
+      - name: Generate baseline images
+        run: tox -e py312-visual -- --mpl-generate-path=tests/ui/baseline
+
+      - name: Compress screenshots
+        run: |
+          sudo apt install optipng
+          find tests/ui/baseline -name '*.png' -exec optipng {} +
+
+      - name: Commit reference images
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          git pull
+
+          git add tests/ui/baseline
+
+          git commit -m "chore: Update visual references"
+          git push

@@ -63,6 +63,16 @@ class LinLogAxis extends bqplot.Axis {
         }
     }
 
+    update_grid_lines(animate) {
+        // Use longer major ticks (10px) when grid lines are off,
+        // so they are clearly distinct from minor ticks (4px).
+        var grid_type = this.model.get('grid_lines');
+        if (grid_type === 'none') {
+            this.axis.tickSize(10);
+        }
+        bqplot.Axis.prototype.update_grid_lines.call(this, animate);
+    }
+
     apply_tick_styling() {
         bqplot.Axis.prototype.apply_tick_styling.call(this);
         this._render_minor_ticks();
@@ -83,6 +93,8 @@ class LinLogAxis extends bqplot.Axis {
         var is_vertical = ['left', 'right'].indexOf(this.model.get('side')) !== -1;
         var side = this.model.get('side');
         var scaleType = this.axis_scale.model.type;
+        var grid_lines = this.model.get('grid_lines');
+        var hasGrid = grid_lines !== 'none';
         var domainMin = Math.min(domain[0], domain[1]);
         var domainMax = Math.max(domain[0], domain[1]);
 
@@ -125,9 +137,29 @@ class LinLogAxis extends bqplot.Axis {
 
         if (minorPositions.length === 0) return;
 
-        var minorTickSize = 4;
+        // When grid lines are present, draw minor grid lines spanning the
+        // full plot area at half opacity. Otherwise draw short tick marks.
+        var minorTickSize;
+        if (hasGrid) {
+            minorTickSize = is_vertical ? this.width : this.height;
+        } else {
+            minorTickSize = 4;
+        }
+
         var color = this.model.get('color') || null;
         var minorGroup = this.g_axisline.append('g').attr('class', 'minor-ticks');
+
+        // Read the actual style from the major grid lines so we match exactly
+        var majorStroke = null;
+        var majorOpacity = null;
+        if (hasGrid) {
+            var majorLine = this.g_axisline.select('.tick line');
+            if (!majorLine.empty()) {
+                majorStroke = majorLine.style('stroke');
+                majorOpacity = parseFloat(majorLine.style('opacity'));
+                if (isNaN(majorOpacity)) majorOpacity = 1;
+            }
+        }
 
         for (var i = 0; i < minorPositions.length; i++) {
             var pixel = scale(minorPositions[i]);
@@ -136,17 +168,31 @@ class LinLogAxis extends bqplot.Axis {
             var line = minorGroup.append('line');
 
             if (is_vertical) {
-                var signX = side === 'left' ? -1 : 1;
+                // Grid: extend into plot (right for left axis, left for right)
+                // Ticks: extend away from plot
+                var signX = hasGrid
+                    ? (side === 'left' ? 1 : -1)
+                    : (side === 'left' ? -1 : 1);
                 line.attr('y1', pixel).attr('y2', pixel)
                     .attr('x1', 0).attr('x2', signX * minorTickSize);
             } else {
-                var signY = side === 'top' ? -1 : 1;
+                // Grid: extend into plot (up for bottom axis, down for top)
+                // Ticks: extend away from plot
+                var signY = hasGrid
+                    ? (side === 'bottom' ? -1 : 1)
+                    : (side === 'top' ? -1 : 1);
                 line.attr('x1', pixel).attr('x2', pixel)
                     .attr('y1', 0).attr('y2', signY * minorTickSize);
             }
 
-            line.attr('stroke', color || '#000')
-                .attr('shape-rendering', 'crispEdges');
+            if (hasGrid) {
+                line.style('stroke', majorStroke || '#000')
+                    .style('opacity', (majorOpacity || 1) * 0.5)
+                    .style('stroke-dasharray', grid_lines === 'dashed' ? '5, 5' : null);
+            } else {
+                line.attr('stroke', color || '#000');
+            }
+            line.attr('shape-rendering', 'crispEdges');
         }
     }
 }

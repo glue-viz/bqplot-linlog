@@ -1,0 +1,158 @@
+name: CI Tests
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build jupyterlab
+
+      - name: Set version from release tag
+        if: github.event_name == 'release'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "__version__ = \"$VERSION\"" > bqplot_linlog/_version.py
+          cd js && npm version $VERSION --no-git-tag-version
+
+      - name: Install JavaScript dependencies
+        run: (cd js && npm ci && npm run build && npm pack)
+
+      - name: Build
+        run: |
+          python -m build
+
+      - name: Upload builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: bqplot-linlog-dist-${{ github.run_number }}
+          path: |
+            ./dist
+            ./js/*.tgz
+
+  tests:
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@v2
+    with:
+      envs: |
+        - linux: py310-test
+        - linux: py313-test
+
+        - macos: py312-test
+
+        - windows: py313-test
+
+  visual:
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@v2
+    with:
+      envs: |
+        - linux: py312-visual
+
+  publish-pypi:
+    needs: [build, tests]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bqplot-linlog-dist-${{ github.run_number }}
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-npm:
+    needs: [build, tests]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bqplot-linlog-dist-${{ github.run_number }}
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish the NPM package
+        run: |
+          if [[ $PRE_RELEASE == "true" ]]; then export TAG="next"; else export TAG="latest"; fi
+          cd js
+          npm publish --tag ${TAG} --access public --provenance *.tgz
+        env:
+          PRE_RELEASE: ${{ github.event.release.prerelease }}
+
+  update-version:
+    needs: [publish-pypi, publish-npm]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      - name: Update version files
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "__version__ = \"$VERSION\"" > bqplot_linlog/_version.py
+          cd js && npm version $VERSION --no-git-tag-version
+
+      - name: Update changelog
+        uses: stefanzweifel/changelog-updater-action@v1
+        with:
+          release-notes: ${{ github.event.release.body }}
+          latest-version: ${{ github.event.release.name }}
+          path-to-changelog: CHANGES.md
+
+      - name: Commit version and changelog update
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bqplot_linlog/_version.py js/package.json CHANGES.md
+          git diff --staged --quiet || git commit -m "Update version to $VERSION and changelog [skip ci]"
+          git push
