@@ -2,7 +2,7 @@
 
 **Note: this package is experimental and the API may change.**
 
-A toggleable linear/log scale and axis with minor ticks for bqplot.
+A toggleable linear/log scale and axis with minor ticks for bqplot, and with improved labels.
 
 ## Features
 
