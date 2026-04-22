@@ -1,0 +1,11 @@
+*.egg-info
+bqplot_linlog/static
+bqplot_linlog/labextension
+bqplot_linlog/nbextension
+dist
+node_modules
+.tox
+.ipynb_checkpoints
+.tmp
+__pycache__
+results

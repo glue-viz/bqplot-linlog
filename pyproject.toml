@@ -1,0 +1,77 @@
+[build-system]
+requires = [
+    "jupyterlab>=3.6",
+    "hatchling",
+    "hatch-jupyter-builder>=0.5.0",
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "bqplot-linlog"
+dynamic = ["version"]
+description = "A toggleable linear/log scale and axis with minor ticks for bqplot"
+readme = "README.md"
+authors = [
+    {name = "Thomas Robitaille", email = "thomas.robitaille@gmail.com"},
+]
+requires-python = ">=3.10"
+keywords = ["ipython", "jupyter", "widgets"]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: IPython",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+    "ipywidgets>=7.0.0",
+    "bqplot>=0.12",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
+[tool.hatch.version]
+path = "bqplot_linlog/_version.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".github",
+]
+
+[tool.hatch.build.targets.wheel]
+include = [
+    "bqplot_linlog",
+]
+
+[tool.hatch.build]
+artifacts = [
+    "bqplot_linlog/nbextension",
+    "bqplot_linlog/labextension",
+]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"bqplot_linlog/nbextension" = "share/jupyter/nbextensions/bqplot-linlog"
+"bqplot_linlog/labextension" = "share/jupyter/labextensions/bqplot-linlog"
+"./bqplot-linlog.json" = "etc/jupyter/nbconfig/notebook.d/bqplot-linlog.json"
+
+[tool.hatch.build.hooks.jupyter-builder]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = [
+    "bqplot_linlog/nbextension/index.js",
+    "bqplot_linlog/labextension/package.json",
+]
+skip-if-exists = [
+    "bqplot_linlog/nbextension/index.js",
+    "bqplot_linlog/labextension/package.json",
+]
+dependencies = [
+    "hatch-jupyter-builder>=0.5.0",
+]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+path = "./js"
+build_cmd = "build"

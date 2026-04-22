@@ -1,0 +1,3 @@
+recursive-include bqplot_linlog/static *.*
+recursive-include etc *.json
+recursive-include share *.*
