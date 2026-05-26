@@ -65,18 +65,23 @@ jobs:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@v2
     with:
       envs: |
-        - linux: py310-test
-        - linux: py313-test
+        - linux: py310-test-bqplot012
+        - linux: py313-test-bqplot012
+        - linux: py310-test-bqplot013
+        - linux: py313-test-bqplot013
 
-        - macos: py312-test
+        - macos: py312-test-bqplot012
+        - macos: py312-test-bqplot013
 
-        - windows: py313-test
+        - windows: py313-test-bqplot012
+        - windows: py313-test-bqplot013
 
   visual:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@v2
     with:
       envs: |
-        - linux: py312-visual
+        - linux: py312-visual-bqplot012
+        - linux: py312-visual-bqplot013
 
   publish-pypi:
     needs: [build, tests]
