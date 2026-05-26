@@ -15,13 +15,10 @@ class LinLogScaleModel extends bqplot.LinearScaleModel {
         };
     }
 
+    // bqplot 0.12: ScaleModel.initialize calls set_init_state() then set_listeners().
     set_init_state() {
-        // Override: make type dynamic based on mode
-        Object.defineProperty(this, 'type', {
-            get: () => this.get('mode') || 'linear',
-            configurable: true,
-        });
-        this._update_global_min_max();
+        this._installTypeGetter();
+        this._updateGlobalMinMax();
     }
 
     set_listeners() {
@@ -29,17 +26,38 @@ class LinLogScaleModel extends bqplot.LinearScaleModel {
         this.on('change:mode', this._mode_changed, this);
     }
 
-    _update_global_min_max() {
-        if (this.get('mode') === 'log') {
-            this.global_min = Number.MIN_VALUE;
-        } else {
-            this.global_min = Number.NEGATIVE_INFINITY;
-        }
-        this.global_max = Number.POSITIVE_INFINITY;
+    // bqplot 0.13 (bqscales): ScaleModel.initialize calls setListeners() only;
+    // there is no set_init_state hook, so do that work here before delegating
+    // so the parent's initial updateDomain sees the right global_min/max.
+    setListeners() {
+        this._installTypeGetter();
+        this._updateGlobalMinMax();
+        bqplot.LinearScaleModel.prototype.setListeners.call(this);
+        this.on('change:mode', this._mode_changed, this);
+    }
+
+    _installTypeGetter() {
+        Object.defineProperty(this, 'type', {
+            get: () => this.get('mode') || 'linear',
+            configurable: true,
+        });
+    }
+
+    _updateGlobalMinMax() {
+        var min = this.get('mode') === 'log'
+            ? Number.MIN_VALUE
+            : Number.NEGATIVE_INFINITY;
+        var max = Number.POSITIVE_INFINITY;
+        // Set both naming conventions so the right property is read in either API.
+        this.global_min = min;
+        this.global_max = max;
+        this.globalMin = min;
+        this.globalMax = max;
     }
 
     _mode_changed() {
-        this._update_global_min_max();
+        this._updateGlobalMinMax();
+        // update_domain exists in 0.12 and as a deprecated alias in bqscales 0.13.
         this.update_domain();
         // Ensure domain is valid for log mode
         if (this.get('mode') === 'log' && this.domain.length >= 2) {

@@ -20,7 +20,13 @@ class LinLogScale extends bqplot.LinearScale {
     }
 
     create_event_listeners() {
-        bqplot.Scale.prototype.create_event_listeners.call(this);
+        // bqplot 0.13 (bqscales) renamed create_event_listeners to createEventListeners.
+        var parentProto = bqplot.Scale.prototype;
+        if (typeof parentProto.createEventListeners === 'function') {
+            parentProto.createEventListeners.call(this);
+        } else {
+            parentProto.create_event_listeners.call(this);
+        }
         this.listenTo(this.model, 'change:mode', this._mode_changed);
     }
 
