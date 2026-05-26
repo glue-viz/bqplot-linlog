@@ -36,8 +36,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install tox
 
-      - name: Generate baseline images
-        run: tox -e py312-visual -- --mpl-generate-path=tests/ui/baseline
+      - name: Generate baseline images (bqplot 0.12)
+        run: tox -e py312-visual-bqplot012 -- --mpl-generate-path=tests/ui/baseline/bqplot012
+
+      - name: Generate baseline images (bqplot 0.13)
+        run: tox -e py312-visual-bqplot013 -- --mpl-generate-path=tests/ui/baseline/bqplot013
 
       - name: Compress screenshots
         run: |

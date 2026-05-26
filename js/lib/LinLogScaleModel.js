@@ -15,13 +15,10 @@ class LinLogScaleModel extends bqplot.LinearScaleModel {
         };
     }
 
+    // bqplot 0.12: ScaleModel.initialize calls set_init_state() then set_listeners().
     set_init_state() {
-        // Override: make type dynamic based on mode
-        Object.defineProperty(this, 'type', {
-            get: () => this.get('mode') || 'linear',
-            configurable: true,
-        });
-        this._update_global_min_max();
+        this._installTypeGetter();
+        this._updateGlobalMinMax();
     }
 
     set_listeners() {
@@ -29,17 +26,54 @@ class LinLogScaleModel extends bqplot.LinearScaleModel {
         this.on('change:mode', this._mode_changed, this);
     }
 
-    _update_global_min_max() {
-        if (this.get('mode') === 'log') {
-            this.global_min = Number.MIN_VALUE;
-        } else {
-            this.global_min = Number.NEGATIVE_INFINITY;
-        }
+    // bqplot 0.13 (bqscales): ScaleModel.initialize calls setListeners() only;
+    // there is no set_init_state hook, so do that work here before delegating
+    // so the parent's initial updateDomain sees the right global_min/max.
+    setListeners() {
+        this._installTypeGetter();
+        this._updateGlobalMinMax();
+        bqplot.LinearScaleModel.prototype.setListeners.call(this);
+        this.on('change:mode', this._mode_changed, this);
+    }
+
+    _installTypeGetter() {
+        // bqscales' LinearScaleModel declares `type = 'linear'` as a class
+        // field initializer that runs after this.initialize completes, so a
+        // getter-only property would crash with "Cannot set property type"
+        // when the parent constructor body assigns to it. Use a no-op setter
+        // so the parent's assignment is silently ignored and our getter wins.
+        var self = this;
+        Object.defineProperty(this, 'type', {
+            get: function () { return self.get('mode') || 'linear'; },
+            set: function () { /* parent class field init may write here */ },
+            configurable: true,
+        });
+    }
+
+    _updateGlobalMinMax() {
+        // Same class-field-runs-late issue as `type`: bqscales' LinearScaleModel
+        // initialises globalMin/globalMax to +/-Infinity after our setListeners
+        // runs, so install accessors that compute from `mode` and ignore writes.
+        var self = this;
+        function logMode() { return self.get('mode') === 'log'; }
+        Object.defineProperty(this, 'globalMin', {
+            get: function () { return logMode() ? Number.MIN_VALUE : Number.NEGATIVE_INFINITY; },
+            set: function () { /* parent class field init may write here */ },
+            configurable: true,
+        });
+        Object.defineProperty(this, 'globalMax', {
+            get: function () { return Number.POSITIVE_INFINITY; },
+            set: function () { /* parent class field init may write here */ },
+            configurable: true,
+        });
+        // bqplot 0.12 reads these as plain snake_case fields.
+        this.global_min = logMode() ? Number.MIN_VALUE : Number.NEGATIVE_INFINITY;
         this.global_max = Number.POSITIVE_INFINITY;
     }
 
     _mode_changed() {
-        this._update_global_min_max();
+        this._updateGlobalMinMax();
+        // update_domain exists in 0.12 and as a deprecated alias in bqscales 0.13.
         this.update_domain();
         // Ensure domain is valid for log mode
         if (this.get('mode') === 'log' && this.domain.length >= 2) {
