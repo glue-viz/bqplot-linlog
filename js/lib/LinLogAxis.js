@@ -41,17 +41,17 @@ class LinLogAxis extends bqplot.Axis {
     }
 
     tickformat_changed() {
-        // For log scales without explicit tick_format, use 10^n notation
+        // For log scales without explicit tick_format, use 10^n notation.
+        // The exponent is emitted as ASCII "10^N" here and converted to an
+        // SVG <tspan baseline-shift="super"> by _render_tick_superscripts,
+        // because chromium's default headless font is missing Unicode
+        // superscript glyphs above U+2073.
         if (this.axis_scale && this.axis_scale.model.type === 'log' &&
             !this.model.get('tick_format')) {
-            var superscripts = '\u2070\u00B9\u00B2\u00B3\u2074\u2075\u2076\u2077\u2078\u2079';
             this.tick_format = function(d) {
                 var exp = Math.round(Math.log10(d));
                 if (exp >= -1 && exp <= 1) return String(d);
-                var s = String(Math.abs(exp)).split('').map(function(c) {
-                    return superscripts[parseInt(c)];
-                }).join('');
-                return '10' + (exp < 0 ? '\u207B' : '') + s;
+                return '10^' + exp;
             };
             this.axis.tickFormat(this.tick_format);
             if (this.g_axisline) {
@@ -61,6 +61,22 @@ class LinLogAxis extends bqplot.Axis {
         } else {
             bqplot.Axis.prototype.tickformat_changed.call(this);
         }
+    }
+
+    _render_tick_superscripts() {
+        if (!this.g_axisline) return;
+        var SVG_NS = 'http://www.w3.org/2000/svg';
+        this.g_axisline.selectAll('.tick text').each(function () {
+            var match = /^10\^(-?\d+)$/.exec(this.textContent);
+            if (!match) return;
+            while (this.firstChild) this.removeChild(this.firstChild);
+            this.appendChild(document.createTextNode('10'));
+            var tspan = document.createElementNS(SVG_NS, 'tspan');
+            tspan.setAttribute('baseline-shift', 'super');
+            tspan.setAttribute('font-size', '70%');
+            tspan.textContent = match[1];
+            this.appendChild(tspan);
+        });
     }
 
     update_grid_lines(animate) {
@@ -75,7 +91,30 @@ class LinLogAxis extends bqplot.Axis {
 
     apply_tick_styling() {
         bqplot.Axis.prototype.apply_tick_styling.call(this);
+        this._render_tick_superscripts();
+        this._install_superscript_observer();
         this._render_minor_ticks();
+    }
+
+    _install_superscript_observer() {
+        // bqplot's getBBox and update_grid_lines re-render g_axisline without
+        // going through apply_tick_styling, so our tspans get wiped. Watch the
+        // axis for any change and re-apply only when a "10^N" marker reappears
+        // (the guard prevents a feedback loop on our own mutations).
+        if (this._superscript_observer || !this.g_axisline) return;
+        var self = this;
+        this._superscript_observer = new MutationObserver(function () {
+            var nodes = self.g_axisline.selectAll('.tick text').nodes();
+            for (var i = 0; i < nodes.length; i++) {
+                if (/^10\^(-?\d+)$/.test(nodes[i].textContent)) {
+                    self._render_tick_superscripts();
+                    return;
+                }
+            }
+        });
+        this._superscript_observer.observe(this.g_axisline.node(), {
+            childList: true, subtree: true, characterData: true,
+        });
     }
 
     update_color() {
