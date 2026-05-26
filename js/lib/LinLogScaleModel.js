@@ -37,22 +37,38 @@ class LinLogScaleModel extends bqplot.LinearScaleModel {
     }
 
     _installTypeGetter() {
+        // bqscales' LinearScaleModel declares `type = 'linear'` as a class
+        // field initializer that runs after this.initialize completes, so a
+        // getter-only property would crash with "Cannot set property type"
+        // when the parent constructor body assigns to it. Use a no-op setter
+        // so the parent's assignment is silently ignored and our getter wins.
+        var self = this;
         Object.defineProperty(this, 'type', {
-            get: () => this.get('mode') || 'linear',
+            get: function () { return self.get('mode') || 'linear'; },
+            set: function () { /* parent class field init may write here */ },
             configurable: true,
         });
     }
 
     _updateGlobalMinMax() {
-        var min = this.get('mode') === 'log'
-            ? Number.MIN_VALUE
-            : Number.NEGATIVE_INFINITY;
-        var max = Number.POSITIVE_INFINITY;
-        // Set both naming conventions so the right property is read in either API.
-        this.global_min = min;
-        this.global_max = max;
-        this.globalMin = min;
-        this.globalMax = max;
+        // Same class-field-runs-late issue as `type`: bqscales' LinearScaleModel
+        // initialises globalMin/globalMax to +/-Infinity after our setListeners
+        // runs, so install accessors that compute from `mode` and ignore writes.
+        var self = this;
+        function logMode() { return self.get('mode') === 'log'; }
+        Object.defineProperty(this, 'globalMin', {
+            get: function () { return logMode() ? Number.MIN_VALUE : Number.NEGATIVE_INFINITY; },
+            set: function () { /* parent class field init may write here */ },
+            configurable: true,
+        });
+        Object.defineProperty(this, 'globalMax', {
+            get: function () { return Number.POSITIVE_INFINITY; },
+            set: function () { /* parent class field init may write here */ },
+            configurable: true,
+        });
+        // bqplot 0.12 reads these as plain snake_case fields.
+        this.global_min = logMode() ? Number.MIN_VALUE : Number.NEGATIVE_INFINITY;
+        this.global_max = Number.POSITIVE_INFINITY;
     }
 
     _mode_changed() {
