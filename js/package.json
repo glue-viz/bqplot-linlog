@@ -1,6 +1,6 @@
 {
   "name": "bqplot-linlog",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A toggleable linear/log scale and axis with minor ticks for bqplot",
   "main": "lib/index.js",
   "repository": {
