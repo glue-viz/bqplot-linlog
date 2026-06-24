@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.1 - 2026-06-24
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+### What's Changed
+
+* Add a LICENSE file by @astrofrog in https://github.com/glue-viz/bqplot-linlog/pull/5
+
+**Full Changelog**: https://github.com/glue-viz/bqplot-linlog/compare/v0.2.0...v0.2.1
+
 ## v0.2.0 - 2026-05-26
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
